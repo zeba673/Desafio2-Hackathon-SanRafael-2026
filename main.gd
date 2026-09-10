@@ -67,7 +67,6 @@ var rock_spawns := [
 	Vector2(255, 500), Vector2(475, 340), Vector2(570, 475)
 ]
 var rocks: Array[Vector2] = []
-var rock_speeds := [42.0, -34.0, 28.0, -46.0, 38.0, -30.0]
 
 func _ready() -> void:
 	get_window().title = "EcoMisión: Rescate en Kayak"
@@ -160,7 +159,6 @@ func update_game(delta: float) -> void:
 	oil_centers[0] = OIL_START_A.lerp(OIL_TARGET_A, travel)
 	oil_centers[1] = OIL_START_B.lerp(OIL_TARGET_B, travel)
 	hit_cooldown = maxf(0.0, hit_cooldown - delta)
-	move_obstacles(delta)
 
 	var movement := Vector2(
 		float(Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT)) - float(Input.is_key_pressed(KEY_A) or Input.is_key_pressed(KEY_LEFT)),
@@ -198,15 +196,6 @@ func update_game(delta: float) -> void:
 	elif time_left <= 0.0:
 		fish_alive = false
 		finish_game(false, "Se acabó el tiempo: el petróleo alcanzó a los peces.")
-
-
-func move_obstacles(delta: float) -> void:
-	for index in rocks.size():
-		rocks[index].x += rock_speeds[index] * delta
-		if rocks[index].x > 620.0:
-			rocks[index].x = 80.0
-		elif rocks[index].x < 80.0:
-			rocks[index].x = 620.0
 
 
 func get_touched_oil() -> int:
