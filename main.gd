@@ -1,6 +1,10 @@
 extends Node2D
 
 enum GameState { MENU, PLAYING, WON, LOST }
+enum NetState { IDLE, CAST, CATCH, MISS }
+
+const KAYAK_SHEET = preload("res://assets/kayak-net-sprites-transparent.png")
+const OBJECT_SHEET = preload("res://assets/river-object-sprites.png")
 
 const SCREEN := Vector2(1152, 648)
 const GAME_TIME := 150.0
@@ -24,6 +28,9 @@ var flash := 0.0
 var notice := ""
 var notice_time := 0.0
 var end_reason := ""
+var net_state := NetState.IDLE
+var net_timer := 0.0
+var pending_bottle := -1
 
 var bottle_spawns := [
 	Vector2(170, 155), Vector2(330, 125), Vector2(505, 180),
@@ -42,6 +49,7 @@ var oil_center := Vector2(930, 430)
 
 func _ready() -> void:
 	get_window().title = "EcoMisión: Rescate en Kayak"
+	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	bottles.assign(bottle_spawns)
 	if "--self-test" in OS.get_cmdline_user_args():
 		run_self_test()
@@ -50,7 +58,14 @@ func _ready() -> void:
 
 func run_self_test() -> void:
 	start_game()
-	bottles = [player]
+	bottles = [Vector2(1000, 100)]
+	cast_net()
+	resolve_net()
+	assert(net_state == NetState.MISS and bottles.size() == 1)
+	start_game()
+	bottles = [player + direction * 92.0]
+	cast_net()
+	resolve_net()
 	update_game(0.01)
 	assert(state == GameState.WON)
 	start_game()
@@ -65,6 +80,13 @@ func _process(delta: float) -> void:
 	wave_time += delta
 	flash = maxf(0.0, flash - delta)
 	notice_time = maxf(0.0, notice_time - delta)
+	if net_timer > 0.0:
+		net_timer -= delta
+		if net_timer <= 0.0:
+			if net_state == NetState.CAST:
+				resolve_net()
+			else:
+				net_state = NetState.IDLE
 	if state == GameState.PLAYING:
 		update_game(delta)
 	queue_redraw()
@@ -93,13 +115,6 @@ func update_game(delta: float) -> void:
 				hit_rock()
 				break
 
-	for index in range(bottles.size() - 1, -1, -1):
-		if player.distance_to(bottles[index]) < 35.0:
-			bottles.remove_at(index)
-			flash = 0.16
-			notice = "+1 botella recuperada"
-			notice_time = 1.1
-
 	if bottles.is_empty():
 		finish_game(true, "¡El río quedó libre de residuos!")
 	elif time_left <= 0.0:
@@ -118,6 +133,35 @@ func hit_rock() -> void:
 	notice_time = 1.5
 
 
+func cast_net() -> void:
+	if net_state != NetState.IDLE:
+		return
+	net_state = NetState.CAST
+	net_timer = 0.18
+	pending_bottle = -1
+	var target := player + direction * 92.0
+	var best_distance := 66.0
+	for index in bottles.size():
+		var distance := bottles[index].distance_to(target)
+		if distance < best_distance:
+			best_distance = distance
+			pending_bottle = index
+
+
+func resolve_net() -> void:
+	if pending_bottle >= 0 and pending_bottle < bottles.size():
+		bottles.remove_at(pending_bottle)
+		net_state = NetState.CATCH
+		flash = 0.16
+		notice = "+1 botella recuperada"
+	else:
+		net_state = NetState.MISS
+		notice = "La red no atrapó nada"
+	net_timer = 0.42
+	notice_time = 1.1
+	pending_bottle = -1
+
+
 func start_game() -> void:
 	state = GameState.PLAYING
 	player = Vector2(105, 330)
@@ -130,6 +174,9 @@ func start_game() -> void:
 	notice = "Recolectá las 12 botellas antes de que avance el petróleo"
 	notice_time = 3.2
 	end_reason = ""
+	net_state = NetState.IDLE
+	net_timer = 0.0
+	pending_bottle = -1
 
 
 func finish_game(won: bool, reason: String) -> void:
@@ -139,7 +186,9 @@ func finish_game(won: bool, reason: String) -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
-		if event.keycode in [KEY_ENTER, KEY_SPACE] and state != GameState.PLAYING:
+		if event.keycode == KEY_SPACE and state == GameState.PLAYING:
+			cast_net()
+		elif event.keycode in [KEY_ENTER, KEY_SPACE] and state != GameState.PLAYING:
 			start_game()
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		if state != GameState.PLAYING and Rect2(442, 492, 268, 58).has_point(event.position):
@@ -181,47 +230,30 @@ func draw_shores() -> void:
 
 
 func draw_oil() -> void:
-	for layer in range(7, 0, -1):
-		var radius := oil_radius * float(layer) / 7.0
-		var wobble := sin(wave_time * 1.4 + layer) * 5.0
-		draw_circle(oil_center + Vector2(wobble, cos(wave_time + layer) * 4.0), radius, Color(0.035, 0.045, 0.055, 0.14 + layer * 0.055))
-	draw_arc(oil_center, oil_radius, 0.0, TAU, 64, Color(0.6, 0.72, 0.76, 0.55), 2.0)
+	draw_circle(oil_center, oil_radius * 0.82, Color(0.025, 0.025, 0.035, 0.72))
+	var size := oil_radius * 2.0
+	draw_texture_rect_region(OBJECT_SHEET, Rect2(oil_center - Vector2.ONE * size * 0.5, Vector2.ONE * size), Rect2(768, 512, 480, 512))
+	draw_arc(oil_center, oil_radius, 0.0, TAU, 64, Color(0.55, 0.15, 0.72, 0.55), 3.0)
 
 
 func draw_rock(at: Vector2) -> void:
-	draw_circle(at + Vector2(3, 5), 26.0, Color(0.02, 0.18, 0.25, 0.25))
-	draw_colored_polygon(PackedVector2Array([at + Vector2(-25, 10), at + Vector2(-16, -18), at + Vector2(6, -25), at + Vector2(25, -5), at + Vector2(18, 19), at + Vector2(-6, 24)]), Color("#59656f"))
-	draw_circle(at + Vector2(-7, -9), 7.0, Color("#89939b"))
+	var source := Rect2(0, 512, 384, 512) if int(at.x) % 2 == 0 else Rect2(384, 512, 384, 512)
+	draw_texture_rect_region(OBJECT_SHEET, Rect2(at - Vector2(43, 43), Vector2(86, 86)), source)
 
 
 func draw_bottle(at: Vector2) -> void:
 	var bob := sin(wave_time * 2.2 + at.x) * 4.0
+	var variant := int(at.x) % 3
 	draw_set_transform(at + Vector2(0, bob), -0.35, Vector2.ONE)
-	draw_rect(Rect2(-8, -18, 16, 34), Color("#b8f2e6"), true)
-	draw_rect(Rect2(-5, -24, 10, 8), Color("#d9fff7"), true)
-	draw_rect(Rect2(-6, -25, 12, 4), Color("#f4a261"), true)
-	draw_line(Vector2(-6, 3), Vector2(6, 3), Color("#2a9d8f"), 3.0)
+	draw_texture_rect_region(OBJECT_SHEET, Rect2(-30, -30, 60, 60), Rect2(variant * 512, 0, 512, 512))
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
 func draw_kayak() -> void:
-	draw_set_transform(player, direction.angle(), Vector2.ONE)
-	draw_shadow_ellipse(Vector2(3, 7), Vector2(34, 13), Color(0.02, 0.18, 0.25, 0.28))
-	draw_colored_polygon(PackedVector2Array([Vector2(-34, 0), Vector2(-18, -12), Vector2(22, -10), Vector2(38, 0), Vector2(22, 10), Vector2(-18, 12)]), Color("#f77f00"))
-	draw_colored_polygon(PackedVector2Array([Vector2(-22, 0), Vector2(-13, -7), Vector2(20, -6), Vector2(29, 0), Vector2(20, 6), Vector2(-13, 7)]), Color("#d62828"))
-	draw_circle(Vector2(3, 0), 8.0, Color("#ffd6a5"))
-	draw_line(Vector2(-19, 17), Vector2(23, -18), Color("#4f3422"), 4.0)
-	draw_colored_polygon(PackedVector2Array([Vector2(-25, 21), Vector2(-18, 13), Vector2(-11, 15), Vector2(-18, 26)]), CREAM)
-	draw_colored_polygon(PackedVector2Array([Vector2(29, -22), Vector2(22, -14), Vector2(15, -16), Vector2(22, -27)]), CREAM)
+	var cell := Vector2(net_state % 2, int(net_state / 2.0)) * 627.0
+	draw_set_transform(player, direction.angle() + PI * 0.5, Vector2.ONE)
+	draw_texture_rect_region(KAYAK_SHEET, Rect2(-66, -66, 132, 132), Rect2(cell, Vector2(627, 627)))
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
-
-
-func draw_shadow_ellipse(center: Vector2, radii: Vector2, color: Color) -> void:
-	var points := PackedVector2Array()
-	for index in range(24):
-		var angle := TAU * index / 24.0
-		points.append(center + Vector2(cos(angle) * radii.x, sin(angle) * radii.y))
-	draw_colored_polygon(points, color)
 
 
 func draw_hud() -> void:
@@ -230,6 +262,7 @@ func draw_hud() -> void:
 	draw_string(font, Vector2(48, 58), "BOTELLAS  %02d / %02d" % [bottle_spawns.size() - bottles.size(), bottle_spawns.size()], HORIZONTAL_ALIGNMENT_LEFT, -1, 24, CREAM)
 	var seconds := maxi(0, ceili(time_left))
 	draw_string(font, Vector2(480, 58), "TIEMPO  %02d:%02d" % [int(seconds / 60.0), seconds % 60], HORIZONTAL_ALIGNMENT_LEFT, -1, 24, CREAM)
+	draw_texture_rect_region(OBJECT_SHEET, Rect2(770, 29, 38, 38), Rect2(1248, 512, 288, 512))
 	var danger := clampf(oil_radius / OIL_LIMIT, 0.0, 1.0)
 	draw_string(font, Vector2(830, 45), "PETRÓLEO", HORIZONTAL_ALIGNMENT_LEFT, -1, 17, CREAM)
 	draw_rect(Rect2(830, 54, 260, 10), Color("#274653"), true)
@@ -246,7 +279,7 @@ func draw_menu() -> void:
 	draw_centered("El petróleo avanza sobre el río.", 300, 22, Color("#d8f3dc"))
 	draw_centered("Recuperá las 12 botellas y esquivá las rocas", 334, 22, Color("#d8f3dc"))
 	draw_centered("antes de que se termine el tiempo.", 368, 22, Color("#d8f3dc"))
-	draw_centered("MOVIMIENTO:  WASD  o  FLECHAS", 427, 18, Color("#a9def9"))
+	draw_centered("MOVIMIENTO: WASD / FLECHAS   ·   RED: ESPACIO", 427, 18, Color("#a9def9"))
 	draw_button("COMENZAR MISIÓN")
 
 
