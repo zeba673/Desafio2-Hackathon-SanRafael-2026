@@ -27,6 +27,7 @@ const FISH_CAGE := Rect2(960, 205, 150, 230)
 const MENU_IMAGE_RECT := Rect2(394, 0, 364, 648)
 const MENU_PLAY_RECT := Rect2(448, 276, 256, 104)
 const END_BUTTON_RECT := Rect2(442, 492, 268, 58)
+const GAME_BACKGROUND_SOURCE := Rect2(0, 88, 1222, 687)
 const OBSTACLE_COUNT := 6
 const OIL_START_A := Vector2(690, 235)
 const OIL_START_B := Vector2(680, 455)
@@ -402,8 +403,8 @@ func _draw() -> void:
 
 
 func draw_game_background() -> void:
-	# Recorta solo parte del cielo para conservar la mayor superficie jugable de agua.
-	draw_texture_rect_region(GAME_BACKGROUND, Rect2(Vector2.ZERO, SCREEN), Rect2(0, 148, 1024, 576))
+	# Usa todo el ancho y recorta solo los bordes verticales para evitar zoom y deformación.
+	draw_texture_rect_region(GAME_BACKGROUND, Rect2(Vector2.ZERO, SCREEN), GAME_BACKGROUND_SOURCE)
 	draw_rect(Rect2(0, 88, SCREEN.x, SCREEN.y - 88), Color(0.0, 0.12, 0.2, 0.08), true)
 
 
@@ -500,7 +501,7 @@ func draw_hud() -> void:
 
 
 func draw_menu() -> void:
-	draw_texture_rect_region(GAME_BACKGROUND, Rect2(Vector2.ZERO, SCREEN), Rect2(0, 148, 1024, 576))
+	draw_texture_rect_region(GAME_BACKGROUND, Rect2(Vector2.ZERO, SCREEN), GAME_BACKGROUND_SOURCE)
 	draw_rect(Rect2(Vector2.ZERO, SCREEN), Color(0.01, 0.06, 0.1, 0.68), true)
 	draw_texture_rect(MENU_BACKGROUND, MENU_IMAGE_RECT, false)
 	draw_rect(MENU_IMAGE_RECT, Color("#b7e4c7"), false, 3.0)
