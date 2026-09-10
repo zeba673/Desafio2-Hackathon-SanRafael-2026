@@ -14,7 +14,11 @@ const FAILURE_SOUND = preload("res://assets/audio/failure.wav")
 const SCREEN := Vector2(1152, 648)
 const GAME_TIME := 150.0
 const PLAYER_SPEED := 255.0
-const OIL_LIMIT := 278.0
+const OIL_RADIUS := 72.0
+const OIL_CLEAN_RATE := 14.0
+const FISH_CAGE := Rect2(938, 178, 184, 276)
+const OIL_START := Vector2(650, 350)
+const OIL_TARGET := Vector2(890, 330)
 const WATER := Color("#168aad")
 const DEEP_WATER := Color("#0b6e91")
 const CREAM := Color("#fff4d6")
@@ -26,7 +30,9 @@ var player := Vector2(105, 330)
 var direction := Vector2.RIGHT
 var bottles: Array[Vector2] = []
 var time_left := GAME_TIME
-var oil_radius := 42.0
+var oil_cleanup := 0.0
+var oil_center := OIL_START
+var fish_alive := true
 var wave_time := 0.0
 var hit_cooldown := 0.0
 var flash := 0.0
@@ -36,21 +42,19 @@ var end_reason := ""
 var net_state := NetState.IDLE
 var net_timer := 0.0
 var pending_bottle := -1
+var oil_clean_notified := false
 
 var bottle_spawns := [
 	Vector2(170, 155), Vector2(330, 125), Vector2(505, 180),
-	Vector2(720, 135), Vector2(985, 170), Vector2(225, 315),
-	Vector2(435, 350), Vector2(655, 300), Vector2(1010, 325),
-	Vector2(300, 505), Vector2(555, 525), Vector2(825, 505)
+	Vector2(720, 135), Vector2(850, 165), Vector2(225, 315),
+	Vector2(435, 350), Vector2(300, 505), Vector2(555, 525),
+	Vector2(825, 505)
 ]
 
 var rocks := [
 	Vector2(260, 220), Vector2(405, 445), Vector2(585, 235),
 	Vector2(750, 405), Vector2(930, 245), Vector2(1030, 500)
 ]
-
-var oil_center := Vector2(930, 430)
-
 
 func _ready() -> void:
 	get_window().title = "EcoMisión: Rescate en Kayak"
@@ -92,6 +96,7 @@ func run_self_test() -> void:
 	bottles = [player + direction * 92.0]
 	cast_net()
 	resolve_net()
+	oil_cleanup = 100.0
 	update_game(0.01)
 	assert(state == GameState.WON)
 	start_game()
@@ -120,7 +125,8 @@ func _process(delta: float) -> void:
 
 func update_game(delta: float) -> void:
 	time_left -= delta
-	oil_radius += delta * 1.62
+	var elapsed := GAME_TIME - maxf(time_left, 0.0)
+	oil_center = OIL_START.lerp(OIL_TARGET, clampf(elapsed / GAME_TIME, 0.0, 1.0))
 	hit_cooldown = maxf(0.0, hit_cooldown - delta)
 
 	var movement := Vector2(
@@ -130,7 +136,7 @@ func update_game(delta: float) -> void:
 
 	if movement != Vector2.ZERO:
 		direction = movement
-		var speed := PLAYER_SPEED * (0.48 if player.distance_to(oil_center) < oil_radius else 1.0)
+		var speed := PLAYER_SPEED * (0.58 if is_touching_oil() else 1.0)
 		var previous := player
 		player += movement * speed * delta
 		player.x = clampf(player.x, 38.0, SCREEN.x - 38.0)
@@ -141,12 +147,31 @@ func update_game(delta: float) -> void:
 				hit_rock()
 				break
 
-	if bottles.is_empty():
+	if is_touching_oil() and Input.is_key_pressed(KEY_SPACE):
+		clean_oil(delta)
+
+	if bottles.is_empty() and oil_cleanup >= 100.0:
 		finish_game(true, "¡El río quedó libre de residuos!")
 	elif time_left <= 0.0:
-		finish_game(false, "Se acabó el tiempo.")
-	elif oil_radius >= OIL_LIMIT:
-		finish_game(false, "La mancha de petróleo se extendió demasiado.")
+		fish_alive = oil_cleanup >= 100.0
+		var reason := "Se acabó el tiempo: el petróleo alcanzó a los peces." if not fish_alive else "Se acabó el tiempo y quedaron botellas en el río."
+		finish_game(false, reason)
+
+
+func is_touching_oil() -> bool:
+	return oil_cleanup < 100.0 and player.distance_to(oil_center) < OIL_RADIUS + 46.0
+
+
+func clean_oil(delta: float) -> void:
+	var previous := oil_cleanup
+	oil_cleanup = minf(100.0, oil_cleanup + OIL_CLEAN_RATE * delta)
+	notice = "Limpiando petróleo... %d%%" % int(oil_cleanup)
+	notice_time = 0.2
+	if previous < 100.0 and oil_cleanup >= 100.0 and not oil_clean_notified:
+		oil_clean_notified = true
+		notice = "¡Petróleo retirado al 100%!"
+		notice_time = 2.0
+		play_sound(COLLECT_SOUND, -1.0, 0.82)
 
 
 func hit_rock() -> void:
@@ -198,10 +223,13 @@ func start_game() -> void:
 	direction = Vector2.RIGHT
 	bottles.assign(bottle_spawns)
 	time_left = GAME_TIME
-	oil_radius = 42.0
+	oil_cleanup = 0.0
+	oil_center = OIL_START
+	fish_alive = true
+	oil_clean_notified = false
 	hit_cooldown = 0.0
 	flash = 0.0
-	notice = "Recolectá las 12 botellas antes de que avance el petróleo"
+	notice = "Recolectá 10 botellas y limpiá el petróleo antes de que llegue a los peces"
 	notice_time = 3.2
 	end_reason = ""
 	net_state = NetState.IDLE
@@ -219,7 +247,8 @@ func finish_game(won: bool, reason: String) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode == KEY_SPACE and state == GameState.PLAYING:
-			cast_net()
+			if not is_touching_oil():
+				cast_net()
 		elif event.keycode in [KEY_ENTER, KEY_SPACE] and state != GameState.PLAYING:
 			start_game()
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
@@ -230,6 +259,7 @@ func _unhandled_input(event: InputEvent) -> void:
 func _draw() -> void:
 	draw_water()
 	draw_shores()
+	draw_fish_cage()
 	draw_oil()
 	for rock in rocks:
 		draw_rock(rock)
@@ -262,10 +292,56 @@ func draw_shores() -> void:
 
 
 func draw_oil() -> void:
-	draw_circle(oil_center, oil_radius * 0.82, Color(0.025, 0.025, 0.035, 0.72))
-	var size := oil_radius * 2.0
+	if oil_cleanup >= 100.0:
+		return
+	var remaining := 1.0 - oil_cleanup / 100.0
+	var radius := OIL_RADIUS * lerpf(0.38, 1.0, sqrt(remaining))
+	draw_circle(oil_center, radius * 0.82, Color(0.025, 0.025, 0.035, 0.72))
+	var size := radius * 2.0
 	draw_texture_rect_region(OBJECT_SHEET, Rect2(oil_center - Vector2.ONE * size * 0.5, Vector2.ONE * size), Rect2(768, 512, 480, 512))
-	draw_arc(oil_center, oil_radius, 0.0, TAU, 64, Color(0.55, 0.15, 0.72, 0.55), 3.0)
+	draw_arc(oil_center, radius, 0.0, TAU, 64, Color(0.55, 0.15, 0.72, 0.55), 3.0)
+	var font := ThemeDB.fallback_font
+	var label := "LIMPIEZA %d%%" % int(oil_cleanup)
+	var label_width := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 15).x
+	draw_string(font, oil_center + Vector2(-label_width * 0.5, -radius - 10), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, CREAM)
+	if is_touching_oil():
+		draw_centered("MANTENÉ ESPACIO PARA LIMPIAR", 604, 18, CREAM)
+		draw_rect(Rect2(376, 615, 400, 10), Color("#17324d"), true)
+		draw_rect(Rect2(376, 615, 400.0 * oil_cleanup / 100.0, 10), GREEN, true)
+
+
+func draw_fish_cage() -> void:
+	draw_rect(FISH_CAGE, Color(0.08, 0.42, 0.55, 0.46), true)
+	draw_rect(FISH_CAGE, Color("#b7e4c7"), false, 4.0)
+	for x in range(int(FISH_CAGE.position.x) + 16, int(FISH_CAGE.end.x), 24):
+		draw_line(Vector2(x, FISH_CAGE.position.y), Vector2(x, FISH_CAGE.end.y), Color(0.72, 0.9, 0.82, 0.38), 2.0)
+	for y in range(int(FISH_CAGE.position.y) + 18, int(FISH_CAGE.end.y), 24):
+		draw_line(Vector2(FISH_CAGE.position.x, y), Vector2(FISH_CAGE.end.x, y), Color(0.72, 0.9, 0.82, 0.38), 2.0)
+	var fish_positions := [Vector2(982, 238), Vector2(1062, 282), Vector2(995, 352), Vector2(1065, 404)]
+	for index in fish_positions.size():
+		var swim := Vector2(sin(wave_time * 1.7 + index) * 8.0, cos(wave_time * 1.3 + index) * 5.0)
+		draw_fish(fish_positions[index] + swim, index % 2 == 0)
+
+
+func draw_fish(at: Vector2, faces_right: bool) -> void:
+	var color := Color("#ffd166") if fish_alive else Color("#6c757d")
+	var facing := 1.0 if faces_right else -1.0
+	draw_set_transform(at, 0.0, Vector2(facing, 1.0))
+	draw_colored_polygon(PackedVector2Array([Vector2(-20, 0), Vector2(-34, -12), Vector2(-34, 12)]), color.darkened(0.18))
+	draw_fish_body(Vector2.ZERO, Vector2(24, 13), color)
+	draw_circle(Vector2(13, -3), 2.5, Color("#102a43"))
+	if not fish_alive:
+		draw_line(Vector2(9, -7), Vector2(17, 1), CORAL, 2.0)
+		draw_line(Vector2(17, -7), Vector2(9, 1), CORAL, 2.0)
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
+func draw_fish_body(center: Vector2, radius: Vector2, color: Color) -> void:
+	var points := PackedVector2Array()
+	for index in range(24):
+		var angle := TAU * float(index) / 24.0
+		points.append(center + Vector2(cos(angle) * radius.x, sin(angle) * radius.y))
+	draw_colored_polygon(points, color)
 
 
 func draw_rock(at: Vector2) -> void:
@@ -293,12 +369,7 @@ func draw_hud() -> void:
 	draw_rect(Rect2(22, 18, 1108, 64), Color(0.02, 0.12, 0.18, 0.88), true)
 	draw_string(font, Vector2(48, 58), "BOTELLAS  %02d / %02d" % [bottle_spawns.size() - bottles.size(), bottle_spawns.size()], HORIZONTAL_ALIGNMENT_LEFT, -1, 24, CREAM)
 	var seconds := maxi(0, ceili(time_left))
-	draw_string(font, Vector2(480, 58), "TIEMPO  %02d:%02d" % [int(seconds / 60.0), seconds % 60], HORIZONTAL_ALIGNMENT_LEFT, -1, 24, CREAM)
-	draw_texture_rect_region(OBJECT_SHEET, Rect2(770, 29, 38, 38), Rect2(1248, 512, 288, 512))
-	var danger := clampf(oil_radius / OIL_LIMIT, 0.0, 1.0)
-	draw_string(font, Vector2(830, 45), "PETRÓLEO", HORIZONTAL_ALIGNMENT_LEFT, -1, 17, CREAM)
-	draw_rect(Rect2(830, 54, 260, 10), Color("#274653"), true)
-	draw_rect(Rect2(830, 54, 260 * danger, 10), GREEN.lerp(CORAL, danger), true)
+	draw_string(font, Vector2(790, 58), "TIEMPO  %02d:%02d" % [int(seconds / 60.0), seconds % 60], HORIZONTAL_ALIGNMENT_LEFT, -1, 24, CREAM)
 	if notice_time > 0.0 and state == GameState.PLAYING:
 		draw_centered(notice, 112, 20, CREAM)
 
@@ -308,10 +379,11 @@ func draw_menu() -> void:
 	draw_panel(Rect2(274, 116, 604, 450))
 	draw_centered("ECOMISIÓN", 190, 48, GREEN)
 	draw_centered("RESCATE EN KAYAK", 232, 28, CREAM)
-	draw_centered("El petróleo avanza sobre el río.", 300, 22, Color("#d8f3dc"))
-	draw_centered("Recuperá las 12 botellas y esquivá las rocas", 334, 22, Color("#d8f3dc"))
-	draw_centered("antes de que se termine el tiempo.", 368, 22, Color("#d8f3dc"))
-	draw_centered("MOVIMIENTO: WASD / FLECHAS   ·   RED: ESPACIO", 427, 18, Color("#a9def9"))
+	draw_centered("El petróleo avanza hacia la jaula de los peces.", 294, 21, Color("#d8f3dc"))
+	draw_centered("Recuperá las 10 botellas y limpiá la mancha al 100%", 328, 21, Color("#d8f3dc"))
+	draw_centered("antes de que se termine el tiempo.", 362, 21, Color("#d8f3dc"))
+	draw_centered("MOVIMIENTO: WASD / FLECHAS   ·   RED: ESPACIO", 416, 17, Color("#a9def9"))
+	draw_centered("SOBRE EL PETRÓLEO: MANTENÉ ESPACIO", 445, 17, GREEN)
 	draw_button("COMENZAR MISIÓN")
 
 
@@ -323,7 +395,8 @@ func draw_end_screen() -> void:
 	draw_centered(end_reason, 290, 22, CREAM)
 	var recovered := bottle_spawns.size() - bottles.size()
 	draw_centered("Botellas recuperadas: %d de %d" % [recovered, bottle_spawns.size()], 342, 23, Color("#a9def9"))
-	draw_centered("Cada residuo retirado ayuda a devolverle vida al río." if won else "El río todavía necesita ayuda. Volvé a intentarlo.", 392, 19, Color("#d8f3dc"))
+	draw_centered("Petróleo limpiado: %d%%" % int(oil_cleanup), 382, 20, GREEN if oil_cleanup >= 100.0 else CORAL)
+	draw_centered("Los peces están a salvo." if won else "El río todavía necesita ayuda. Volvé a intentarlo.", 420, 19, Color("#d8f3dc"))
 	draw_button("JUGAR DE NUEVO")
 
 
