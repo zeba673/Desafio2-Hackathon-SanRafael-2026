@@ -17,13 +17,14 @@ const PLAYER_SPEED := 255.0
 const MAX_HITS := 3
 const HIT_TIME_PENALTY := 5.0
 const OIL_CLEAR_BONUS := 10.0
+const BOTTLE_TOTAL := 20
 const OIL_RADIUS := 54.0
 const OIL_CLEAN_RATE := 14.0
-const FISH_CAGE := Rect2(938, 178, 184, 276)
-const OIL_START_A := Vector2(620, 245)
-const OIL_START_B := Vector2(610, 455)
-const OIL_TARGET_A := Vector2(890, 255)
-const OIL_TARGET_B := Vector2(890, 390)
+const FISH_CAGE := Rect2(960, 205, 150, 230)
+const OIL_START_A := Vector2(690, 235)
+const OIL_START_B := Vector2(680, 455)
+const OIL_TARGET_A := Vector2(915, 265)
+const OIL_TARGET_B := Vector2(915, 385)
 const WATER := Color("#168aad")
 const DEEP_WATER := Color("#0b6e91")
 const CREAM := Color("#fff4d6")
@@ -34,6 +35,7 @@ var state := GameState.MENU
 var player := Vector2(105, 330)
 var direction := Vector2.RIGHT
 var bottles: Array[Vector2] = []
+var bottles_collected := 0
 var time_left := GAME_TIME
 var oil_cleanups := [0.0, 0.0]
 var oil_centers := [OIL_START_A, OIL_START_B]
@@ -50,16 +52,18 @@ var net_timer := 0.0
 var pending_bottle := -1
 var oil_clean_notified := [false, false]
 
-var bottle_spawns := [
-	Vector2(125, 135), Vector2(225, 165), Vector2(335, 125), Vector2(450, 178), Vector2(565, 135),
-	Vector2(690, 170), Vector2(805, 125), Vector2(875, 205), Vector2(165, 280), Vector2(300, 305),
-	Vector2(440, 275), Vector2(565, 325), Vector2(725, 285), Vector2(850, 335), Vector2(135, 455),
-	Vector2(260, 515), Vector2(390, 455), Vector2(525, 535), Vector2(700, 485), Vector2(850, 535)
+var bottle_wave_one := [
+	Vector2(135, 145), Vector2(255, 175), Vector2(375, 130), Vector2(500, 175), Vector2(610, 125),
+	Vector2(165, 300), Vector2(305, 335), Vector2(445, 285), Vector2(565, 350), Vector2(620, 520)
+]
+var bottle_wave_two := [
+	Vector2(120, 180), Vector2(245, 125), Vector2(370, 200), Vector2(505, 135), Vector2(610, 280),
+	Vector2(145, 465), Vector2(280, 530), Vector2(415, 455), Vector2(540, 535), Vector2(635, 410)
 ]
 
 var rock_spawns := [
-	Vector2(235, 225), Vector2(380, 405), Vector2(540, 220),
-	Vector2(710, 400), Vector2(825, 255), Vector2(540, 485)
+	Vector2(220, 235), Vector2(360, 410), Vector2(510, 225),
+	Vector2(255, 500), Vector2(475, 340), Vector2(570, 475)
 ]
 var rocks: Array[Vector2] = []
 var rock_speeds := [42.0, -34.0, 28.0, -46.0, 38.0, -30.0]
@@ -67,7 +71,7 @@ var rock_speeds := [42.0, -34.0, 28.0, -46.0, 38.0, -30.0]
 func _ready() -> void:
 	get_window().title = "EcoMisión: Rescate en Kayak"
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	bottles.assign(bottle_spawns)
+	bottles.assign(bottle_wave_one)
 	rocks.assign(rock_spawns)
 	start_ambience()
 	if "--self-test" in OS.get_cmdline_user_args():
@@ -97,10 +101,14 @@ func play_sound(stream: AudioStream, volume_db := 0.0, pitch_scale := 1.0) -> vo
 
 func run_self_test() -> void:
 	start_game()
-	bottles.resize(11)
+	bottles_collected = 9
 	assert(not oil_is_unlocked(0))
-	bottles.resize(10)
+	bottles_collected = 10
 	assert(oil_is_unlocked(0) and not oil_is_unlocked(1))
+	bottles.clear()
+	time_left = 50.0
+	clean_oil(0, 100.0 / OIL_CLEAN_RATE)
+	assert(oil_cleanups[0] >= 100.0 and bottles.size() == 10 and time_left == 60.0)
 	start_game()
 	bottles = [Vector2(1000, 100)]
 	cast_net()
@@ -110,6 +118,8 @@ func run_self_test() -> void:
 	bottles = [player + direction * 92.0]
 	cast_net()
 	resolve_net()
+	bottles_collected = BOTTLE_TOTAL
+	bottles.clear()
 	oil_cleanups = [100.0, 100.0]
 	update_game(0.01)
 	assert(state == GameState.WON)
@@ -164,8 +174,13 @@ func update_game(delta: float) -> void:
 		player.x = clampf(player.x, 28.0, SCREEN.x - 28.0)
 		player.y = clampf(player.y, 94.0, SCREEN.y - 28.0)
 	for rock in rocks:
-		if player.distance_to(rock) < 29.0:
-			player = previous
+		if player.distance_to(rock) < 29.0 and hit_cooldown <= 0.0:
+			var push_direction := rock.direction_to(player)
+			if push_direction == Vector2.ZERO:
+				push_direction = Vector2.LEFT
+			player = previous + push_direction * 44.0
+			player.x = clampf(player.x, 28.0, SCREEN.x - 28.0)
+			player.y = clampf(player.y, 94.0, SCREEN.y - 28.0)
 			hit_rock()
 			break
 
@@ -187,10 +202,10 @@ func update_game(delta: float) -> void:
 func move_obstacles(delta: float) -> void:
 	for index in rocks.size():
 		rocks[index].x += rock_speeds[index] * delta
-		if rocks[index].x > 900.0:
+		if rocks[index].x > 620.0:
 			rocks[index].x = 80.0
 		elif rocks[index].x < 80.0:
-			rocks[index].x = 900.0
+			rocks[index].x = 620.0
 
 
 func get_touched_oil() -> int:
@@ -201,7 +216,7 @@ func get_touched_oil() -> int:
 
 
 func collected_bottles() -> int:
-	return bottle_spawns.size() - bottles.size()
+	return bottles_collected
 
 
 func oil_is_unlocked(index: int) -> bool:
@@ -223,12 +238,14 @@ func clean_oil(index: int, delta: float) -> void:
 		notice = "¡Charco %d limpio! +10 segundos" % (index + 1)
 		notice_time = 2.0
 		play_sound(COLLECT_SOUND, -1.0, 0.82)
+		if index == 0:
+			bottles.assign(bottle_wave_two)
 
 
 func hit_rock() -> void:
 	if hit_cooldown > 0.0:
 		return
-	hit_cooldown = 0.7
+	hit_cooldown = 1.15
 	hit_count += 1
 	time_left = maxf(0.0, time_left - HIT_TIME_PENALTY)
 	flash = 0.35
@@ -256,18 +273,25 @@ func cast_net() -> void:
 
 
 func resolve_net() -> void:
+	notice_time = 1.1
 	if pending_bottle >= 0 and pending_bottle < bottles.size():
 		bottles.remove_at(pending_bottle)
+		bottles_collected += 1
 		net_state = NetState.CATCH
 		play_sound(COLLECT_SOUND, -2.0, 1.08)
 		flash = 0.16
 		notice = "+1 botella recuperada"
+		if bottles_collected == 10:
+			notice = "¡10 botellas! Ya podés limpiar el charco 1"
+			notice_time = 2.0
+		elif bottles_collected == BOTTLE_TOTAL:
+			notice = "¡20 botellas! Ya podés limpiar el charco 2"
+			notice_time = 2.0
 	else:
 		net_state = NetState.MISS
 		notice = "La red no atrapó nada"
 		play_sound(FAILURE_SOUND, -9.0, 1.25)
 	net_timer = 0.42
-	notice_time = 1.1
 	pending_bottle = -1
 
 
@@ -275,7 +299,8 @@ func start_game() -> void:
 	state = GameState.PLAYING
 	player = Vector2(105, 330)
 	direction = Vector2.RIGHT
-	bottles.assign(bottle_spawns)
+	bottles.assign(bottle_wave_one)
+	bottles_collected = 0
 	rocks.assign(rock_spawns)
 	time_left = GAME_TIME
 	oil_cleanups = [0.0, 0.0]
@@ -295,6 +320,8 @@ func start_game() -> void:
 
 
 func finish_game(won: bool, reason: String) -> void:
+	if state != GameState.PLAYING:
+		return
 	state = GameState.WON if won else GameState.LOST
 	end_reason = reason
 	play_sound(VICTORY_SOUND if won else FAILURE_SOUND, -1.5)
@@ -303,7 +330,8 @@ func finish_game(won: bool, reason: String) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode == KEY_SPACE and state == GameState.PLAYING:
-			if get_touched_oil() < 0:
+			var touched_oil := get_touched_oil()
+			if touched_oil < 0 or not oil_is_unlocked(touched_oil):
 				cast_net()
 		elif event.keycode in [KEY_ENTER, KEY_SPACE] and state != GameState.PLAYING:
 			start_game()
@@ -359,9 +387,15 @@ func draw_oil(index: int) -> void:
 	draw_texture_rect_region(OBJECT_SHEET, Rect2(center - Vector2.ONE * size * 0.5, Vector2.ONE * size), Rect2(768, 512, 480, 512))
 	draw_arc(center, radius, 0.0, TAU, 64, Color(0.55, 0.15, 0.72, 0.55), 3.0)
 	var font := ThemeDB.fallback_font
-	var label := "CHARCO %d · %d%%" % [index + 1, int(oil_cleanups[index])] if oil_is_unlocked(index) else "BLOQUEADO · %d BOTELLAS" % ((index + 1) * 10)
-	var label_width := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 15).x
-	draw_string(font, center + Vector2(-label_width * 0.5, -radius - 10), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, CREAM)
+	var label := ""
+	if index == 1 and not oil_clean_notified[0]:
+		label = "ETAPA 2 · LIMPIÁ EL CHARCO 1"
+	elif oil_is_unlocked(index):
+		label = "CHARCO %d · %d%%" % [index + 1, int(oil_cleanups[index])]
+	else:
+		label = "CHARCO %d · REQUIERE %d BOTELLAS" % [index + 1, (index + 1) * 10]
+	var label_width := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x
+	draw_string(font, center + Vector2(-label_width * 0.5, -radius - 8), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, CREAM)
 	if get_touched_oil() == index:
 		draw_centered("MANTENÉ ESPACIO PARA LIMPIAR" if oil_is_unlocked(index) else "RECOLECTÁ LAS BOTELLAS NECESARIAS", 604, 18, CREAM)
 		draw_rect(Rect2(376, 615, 400, 10), Color("#17324d"), true)
@@ -443,7 +477,7 @@ func draw_kayak() -> void:
 func draw_hud() -> void:
 	var font := ThemeDB.fallback_font
 	draw_rect(Rect2(22, 18, 1108, 64), Color(0.02, 0.12, 0.18, 0.88), true)
-	draw_string(font, Vector2(48, 58), "BOTELLAS  %02d / %02d" % [collected_bottles(), bottle_spawns.size()], HORIZONTAL_ALIGNMENT_LEFT, -1, 22, CREAM)
+	draw_string(font, Vector2(48, 58), "BOTELLAS  %02d / %02d" % [collected_bottles(), BOTTLE_TOTAL], HORIZONTAL_ALIGNMENT_LEFT, -1, 22, CREAM)
 	draw_string(font, Vector2(448, 58), "GOLPES  %d / %d" % [hit_count, MAX_HITS], HORIZONTAL_ALIGNMENT_LEFT, -1, 22, CORAL if hit_count >= 2 else CREAM)
 	var seconds := maxi(0, ceili(time_left))
 	draw_string(font, Vector2(820, 58), "TIEMPO  %02d:%02d" % [int(seconds / 60.0), seconds % 60], HORIZONTAL_ALIGNMENT_LEFT, -1, 22, CREAM)
@@ -470,8 +504,7 @@ func draw_end_screen() -> void:
 	var won := state == GameState.WON
 	draw_centered("¡MISIÓN CUMPLIDA!" if won else "MISIÓN INCOMPLETA", 224, 38, GREEN if won else CORAL)
 	draw_centered(end_reason, 290, 22, CREAM)
-	var recovered := bottle_spawns.size() - bottles.size()
-	draw_centered("Botellas recuperadas: %d de %d" % [recovered, bottle_spawns.size()], 342, 23, Color("#a9def9"))
+	draw_centered("Botellas recuperadas: %d de %d" % [bottles_collected, BOTTLE_TOTAL], 342, 23, Color("#a9def9"))
 	var total_cleanup: float = (oil_cleanups[0] + oil_cleanups[1]) * 0.5
 	draw_centered("Petróleo limpiado: %d%%" % int(total_cleanup), 382, 20, GREEN if all_oil_clean() else CORAL)
 	draw_centered("Los peces están a salvo." if won else "El río todavía necesita ayuda. Volvé a intentarlo.", 420, 19, Color("#d8f3dc"))
