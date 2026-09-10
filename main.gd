@@ -16,7 +16,7 @@ const SCREEN := Vector2(1152, 648)
 const GAME_TIME := 85.0
 const PLAYER_SPEED := 255.0
 const MAX_HITS := 3
-const HIT_TIME_PENALTY := 5.0
+const HIT_TIME_PENALTY := 10.0
 const OIL_CLEAR_BONUS := 10.0
 const BOTTLE_TOTAL := 20
 const OIL_RADIUS := 54.0
@@ -100,6 +100,7 @@ func play_sound(stream: AudioStream, volume_db := 0.0, pitch_scale := 1.0) -> vo
 
 
 func run_self_test() -> void:
+	assert(cage_blocks(FISH_CAGE.get_center()) and not cage_blocks(Vector2(100, 100)))
 	start_game()
 	bottles_collected = 9
 	assert(not oil_is_unlocked(0))
@@ -127,7 +128,7 @@ func run_self_test() -> void:
 	for index in range(3):
 		hit_cooldown = 0.0
 		hit_rock()
-	assert(state == GameState.LOST and hit_count == MAX_HITS)
+	assert(state == GameState.LOST and hit_count == MAX_HITS and is_equal_approx(time_left, 55.0))
 	start_game()
 	time_left = 0.0
 	update_game(0.01)
@@ -172,6 +173,10 @@ func update_game(delta: float) -> void:
 		player += movement * speed * delta
 		player.x = clampf(player.x, 28.0, SCREEN.x - 28.0)
 		player.y = clampf(player.y, 94.0, SCREEN.y - 28.0)
+		if cage_blocks(player):
+			player = previous
+			notice = "La jaula protege a los peces"
+			notice_time = 0.5
 	for rock in rocks:
 		if player.distance_to(rock) < 29.0 and hit_cooldown <= 0.0:
 			var push_direction := rock.direction_to(player)
@@ -196,6 +201,10 @@ func update_game(delta: float) -> void:
 	elif time_left <= 0.0:
 		fish_alive = false
 		finish_game(false, "Se acabó el tiempo: el petróleo alcanzó a los peces.")
+
+
+func cage_blocks(candidate_position: Vector2) -> bool:
+	return FISH_CAGE.grow(28.0).has_point(candidate_position)
 
 
 func get_touched_oil() -> int:
@@ -239,7 +248,7 @@ func hit_rock() -> void:
 	hit_count += 1
 	time_left = maxf(0.0, time_left - HIT_TIME_PENALTY)
 	flash = 0.35
-	notice = "¡Golpe %d/%d! -5 segundos" % [hit_count, MAX_HITS]
+	notice = "¡Golpe %d/%d! -10 segundos" % [hit_count, MAX_HITS]
 	notice_time = 1.5
 	play_sound(WATER_IMPACT, -5.0, 0.72)
 	if hit_count >= MAX_HITS:
@@ -466,7 +475,7 @@ func draw_menu() -> void:
 	draw_centered("Hay 20 botellas: 10 desbloquean cada charco.", 286, 20, Color("#d8f3dc"))
 	draw_centered("Acercate al petróleo y mantené ESPACIO para limpiarlo.", 320, 18, Color("#d8f3dc"))
 	draw_centered("Cada charco limpio suma 10 segundos.", 354, 18, GREEN)
-	draw_centered("Cada golpe resta 5 segundos · 3 golpes terminan la misión.", 386, 17, CORAL)
+	draw_centered("Cada golpe resta 10 segundos · 3 golpes terminan la misión.", 386, 17, CORAL)
 	draw_centered("MOVIMIENTO: WASD / FLECHAS   ·   RED: ESPACIO", 429, 17, Color("#a9def9"))
 	draw_button("COMENZAR MISIÓN")
 
