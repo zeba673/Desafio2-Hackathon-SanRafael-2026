@@ -6,6 +6,8 @@ enum NetState { IDLE, CAST, CATCH, MISS }
 const KAYAK_SHEET = preload("res://assets/kayak-net-sprites-transparent.png")
 const OBJECT_SHEET = preload("res://assets/river-object-sprites.png")
 const FISH_STATE_SHEET = preload("res://assets/fish-state-sprites.png")
+const MENU_BACKGROUND = preload("res://assets/menu-inicial.png")
+const GAME_BACKGROUND = preload("res://assets/fondo-rio-san-rafael.png")
 const RIVER_AMBIENCE = preload("res://assets/audio/river_ambience.wav")
 const WATER_IMPACT = preload("res://assets/audio/water_impact.wav")
 const COLLECT_SOUND = preload("res://assets/audio/collect.wav")
@@ -22,6 +24,10 @@ const BOTTLE_TOTAL := 20
 const OIL_RADIUS := 54.0
 const OIL_CLEAN_RATE := 14.0
 const FISH_CAGE := Rect2(960, 205, 150, 230)
+const MENU_IMAGE_RECT := Rect2(394, 0, 364, 648)
+const MENU_PLAY_RECT := Rect2(448, 276, 256, 104)
+const END_BUTTON_RECT := Rect2(442, 492, 268, 58)
+const OBSTACLE_COUNT := 6
 const OIL_START_A := Vector2(690, 235)
 const OIL_START_B := Vector2(680, 455)
 const OIL_TARGET_A := Vector2(915, 265)
@@ -62,17 +68,15 @@ var bottle_wave_two := [
 	Vector2(145, 465), Vector2(280, 530), Vector2(415, 455), Vector2(540, 535), Vector2(635, 410)
 ]
 
-var rock_spawns := [
-	Vector2(220, 235), Vector2(360, 410), Vector2(510, 225),
-	Vector2(255, 500), Vector2(475, 340), Vector2(570, 475)
-]
 var rocks: Array[Vector2] = []
+var obstacle_rng := RandomNumberGenerator.new()
 
 func _ready() -> void:
 	get_window().title = "EcoMisión: Rescate en Kayak"
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	bottles.assign(bottle_wave_one)
-	rocks.assign(rock_spawns)
+	obstacle_rng.randomize()
+	randomize_obstacles()
 	start_ambience()
 	if "--self-test" in OS.get_cmdline_user_args():
 		run_self_test()
@@ -101,6 +105,11 @@ func play_sound(stream: AudioStream, volume_db := 0.0, pitch_scale := 1.0) -> vo
 
 func run_self_test() -> void:
 	assert(cage_blocks(FISH_CAGE.get_center()) and not cage_blocks(Vector2(100, 100)))
+	start_game()
+	player = rocks[0]
+	hit_cooldown = 1.0
+	update_game(0.0)
+	assert(player.distance_to(rocks[0]) >= 28.9 and hit_count == 0)
 	start_game()
 	bottles_collected = 9
 	assert(not oil_is_unlocked(0))
@@ -178,14 +187,17 @@ func update_game(delta: float) -> void:
 			notice = "La jaula protege a los peces"
 			notice_time = 0.5
 	for rock in rocks:
-		if player.distance_to(rock) < 29.0 and hit_cooldown <= 0.0:
+		if player.distance_to(rock) < 29.0:
 			var push_direction := rock.direction_to(player)
 			if push_direction == Vector2.ZERO:
 				push_direction = Vector2.LEFT
-			player = previous + push_direction * 44.0
+			player = previous
+			if player.distance_to(rock) < 29.0:
+				player = rock + push_direction * 29.0
 			player.x = clampf(player.x, 28.0, SCREEN.x - 28.0)
 			player.y = clampf(player.y, 94.0, SCREEN.y - 28.0)
-			hit_rock()
+			if hit_cooldown <= 0.0:
+				hit_rock()
 			break
 
 	var touched_oil := get_touched_oil()
@@ -205,6 +217,35 @@ func update_game(delta: float) -> void:
 
 func cage_blocks(candidate_position: Vector2) -> bool:
 	return FISH_CAGE.grow(28.0).has_point(candidate_position)
+
+
+func randomize_obstacles() -> void:
+	rocks.clear()
+	var attempts := 0
+	while rocks.size() < OBSTACLE_COUNT and attempts < 300:
+		attempts += 1
+		var candidate := Vector2(
+			obstacle_rng.randf_range(185.0, 625.0),
+			obstacle_rng.randf_range(135.0, 565.0)
+		)
+		if obstacle_position_is_safe(candidate):
+			rocks.append(candidate)
+
+
+func obstacle_position_is_safe(candidate: Vector2) -> bool:
+	if candidate.distance_to(Vector2(105, 330)) < 105.0:
+		return false
+	if candidate.distance_to(OIL_START_A) < 115.0 or candidate.distance_to(OIL_START_B) < 115.0:
+		return false
+	if FISH_CAGE.grow(75.0).has_point(candidate):
+		return false
+	for bottle in bottle_wave_one + bottle_wave_two:
+		if candidate.distance_to(bottle) < 62.0:
+			return false
+	for rock in rocks:
+		if candidate.distance_to(rock) < 86.0:
+			return false
+	return true
 
 
 func get_touched_oil() -> int:
@@ -300,7 +341,7 @@ func start_game() -> void:
 	direction = Vector2.RIGHT
 	bottles.assign(bottle_wave_one)
 	bottles_collected = 0
-	rocks.assign(rock_spawns)
+	randomize_obstacles()
 	time_left = GAME_TIME
 	oil_cleanups = [0.0, 0.0]
 	oil_centers = [OIL_START_A, OIL_START_B]
@@ -335,13 +376,16 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif event.keycode in [KEY_ENTER, KEY_SPACE] and state != GameState.PLAYING:
 			start_game()
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		if state != GameState.PLAYING and Rect2(442, 492, 268, 58).has_point(event.position):
+		var button_rect := MENU_PLAY_RECT if state == GameState.MENU else END_BUTTON_RECT
+		if state != GameState.PLAYING and button_rect.has_point(event.position):
 			start_game()
 
 
 func _draw() -> void:
-	draw_water()
-	draw_shores()
+	if state == GameState.MENU:
+		draw_menu()
+		return
+	draw_game_background()
 	draw_fish_cage()
 	for index in oil_centers.size():
 		draw_oil(index)
@@ -351,28 +395,16 @@ func _draw() -> void:
 		draw_bottle(bottle)
 	draw_kayak()
 	draw_hud()
-	if state == GameState.MENU:
-		draw_menu()
-	elif state in [GameState.WON, GameState.LOST]:
+	if state in [GameState.WON, GameState.LOST]:
 		draw_end_screen()
 	if flash > 0.0:
 		draw_rect(Rect2(Vector2.ZERO, SCREEN), Color(1, 1, 1, flash * 0.45))
 
 
-func draw_water() -> void:
-	draw_rect(Rect2(Vector2.ZERO, SCREEN), WATER)
-	for row in range(8):
-		for column in range(12):
-			var x := float(column * 108 - 30) + sin(wave_time * 1.5 + row) * 12.0
-			var y := float(95 + row * 70) + cos(wave_time + column) * 5.0
-			draw_arc(Vector2(x, y), 24.0, 0.15, 2.7, 18, Color(0.65, 0.94, 1.0, 0.22), 3.0)
-
-
-func draw_shores() -> void:
-	draw_colored_polygon(PackedVector2Array([Vector2.ZERO, Vector2(SCREEN.x, 0), Vector2(SCREEN.x, 76), Vector2(0, 92)]), Color("#e9c46a"))
-	draw_colored_polygon(PackedVector2Array([Vector2(0, 0), Vector2(SCREEN.x, 0), Vector2(SCREEN.x, 38), Vector2(0, 50)]), Color("#588157"))
-	for x in range(18, 1152, 72):
-		draw_circle(Vector2(x, 56 + sin(float(x)) * 7.0), 13.0, Color("#3a5a40"))
+func draw_game_background() -> void:
+	# Recorta solo parte del cielo para conservar la mayor superficie jugable de agua.
+	draw_texture_rect_region(GAME_BACKGROUND, Rect2(Vector2.ZERO, SCREEN), Rect2(0, 148, 1024, 576))
+	draw_rect(Rect2(0, 88, SCREEN.x, SCREEN.y - 88), Color(0.0, 0.12, 0.2, 0.08), true)
 
 
 func draw_oil(index: int) -> void:
@@ -458,26 +490,22 @@ func draw_kayak() -> void:
 
 func draw_hud() -> void:
 	var font := ThemeDB.fallback_font
-	draw_rect(Rect2(22, 18, 1108, 64), Color(0.02, 0.12, 0.18, 0.88), true)
-	draw_string(font, Vector2(48, 58), "BOTELLAS  %02d / %02d" % [collected_bottles(), BOTTLE_TOTAL], HORIZONTAL_ALIGNMENT_LEFT, -1, 22, CREAM)
-	draw_string(font, Vector2(448, 58), "GOLPES  %d / %d" % [hit_count, MAX_HITS], HORIZONTAL_ALIGNMENT_LEFT, -1, 22, CORAL if hit_count >= 2 else CREAM)
+	draw_rect(Rect2(16, 10, 1120, 48), Color(0.02, 0.12, 0.18, 0.88), true)
+	draw_string(font, Vector2(38, 43), "BOTELLAS  %02d / %02d" % [collected_bottles(), BOTTLE_TOTAL], HORIZONTAL_ALIGNMENT_LEFT, -1, 20, CREAM)
+	draw_string(font, Vector2(448, 43), "GOLPES  %d / %d" % [hit_count, MAX_HITS], HORIZONTAL_ALIGNMENT_LEFT, -1, 20, CORAL if hit_count >= 2 else CREAM)
 	var seconds := maxi(0, ceili(time_left))
-	draw_string(font, Vector2(820, 58), "TIEMPO  %02d:%02d" % [int(seconds / 60.0), seconds % 60], HORIZONTAL_ALIGNMENT_LEFT, -1, 22, CREAM)
+	draw_string(font, Vector2(824, 43), "TIEMPO  %02d:%02d" % [int(seconds / 60.0), seconds % 60], HORIZONTAL_ALIGNMENT_LEFT, -1, 20, CREAM)
 	if notice_time > 0.0 and state == GameState.PLAYING:
-		draw_centered(notice, 112, 20, CREAM)
+		draw_centered(notice, 82, 18, CREAM)
 
 
 func draw_menu() -> void:
-	draw_rect(Rect2(0, 0, SCREEN.x, SCREEN.y), Color(0.015, 0.07, 0.1, 0.76), true)
-	draw_panel(Rect2(274, 116, 604, 450))
-	draw_centered("ECOMISIÓN", 190, 48, GREEN)
-	draw_centered("RESCATE EN KAYAK", 232, 28, CREAM)
-	draw_centered("Hay 20 botellas: 10 desbloquean cada charco.", 286, 20, Color("#d8f3dc"))
-	draw_centered("Acercate al petróleo y mantené ESPACIO para limpiarlo.", 320, 18, Color("#d8f3dc"))
-	draw_centered("Cada charco limpio suma 10 segundos.", 354, 18, GREEN)
-	draw_centered("Cada golpe resta 10 segundos · 3 golpes terminan la misión.", 386, 17, CORAL)
-	draw_centered("MOVIMIENTO: WASD / FLECHAS   ·   RED: ESPACIO", 429, 17, Color("#a9def9"))
-	draw_button("COMENZAR MISIÓN")
+	draw_texture_rect_region(GAME_BACKGROUND, Rect2(Vector2.ZERO, SCREEN), Rect2(0, 148, 1024, 576))
+	draw_rect(Rect2(Vector2.ZERO, SCREEN), Color(0.01, 0.06, 0.1, 0.68), true)
+	draw_texture_rect(MENU_BACKGROUND, MENU_IMAGE_RECT, false)
+	draw_rect(MENU_IMAGE_RECT, Color("#b7e4c7"), false, 3.0)
+	draw_rect(MENU_PLAY_RECT, Color(1, 1, 1, 0.001), true)
+	draw_centered("ENTER / ESPACIO PARA JUGAR", 633, 15, CREAM)
 
 
 func draw_end_screen() -> void:
