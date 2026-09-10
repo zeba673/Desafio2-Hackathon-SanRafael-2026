@@ -5,6 +5,7 @@ enum NetState { IDLE, CAST, CATCH, MISS }
 
 const KAYAK_SHEET = preload("res://assets/kayak-net-sprites-transparent.png")
 const OBJECT_SHEET = preload("res://assets/river-object-sprites.png")
+const FISH_STATE_SHEET = preload("res://assets/fish-state-sprites.png")
 const RIVER_AMBIENCE = preload("res://assets/audio/river_ambience.wav")
 const WATER_IMPACT = preload("res://assets/audio/water_impact.wav")
 const COLLECT_SOUND = preload("res://assets/audio/collect.wav")
@@ -416,34 +417,17 @@ func draw_fish_cage() -> void:
 
 
 func draw_fish(at: Vector2, faces_right: bool) -> void:
-	var facing := 1.0 if faces_right else -1.0
-	draw_set_transform(at, 0.0, Vector2(facing, 1.0))
+	var frame := 0
 	if not fish_alive:
-		draw_circle(Vector2(15, 0), 8.0, Color("#d9e2ec"), false, 3.0)
-		draw_line(Vector2(-24, 0), Vector2(8, 0), Color("#d9e2ec"), 3.0)
-		for rib_x in range(-18, 7, 7):
-			draw_line(Vector2(rib_x, -8), Vector2(rib_x + 4, 8), Color("#d9e2ec"), 2.0)
-		draw_colored_polygon(PackedVector2Array([Vector2(-24, 0), Vector2(-36, -10), Vector2(-36, 10)]), Color("#d9e2ec"))
-		draw_line(Vector2(12, -4), Vector2(18, 2), CORAL, 2.0)
-		draw_line(Vector2(18, -4), Vector2(12, 2), CORAL, 2.0)
-	else:
-		var sick := state == GameState.PLAYING and time_left <= 25.0 and not all_oil_clean()
-		var color := Color("#a3b18a") if sick else Color("#ffd166")
-		draw_colored_polygon(PackedVector2Array([Vector2(-16, 0), Vector2(-27, -9), Vector2(-27, 9)]), color.darkened(0.18))
-		draw_fish_body(Vector2.ZERO, Vector2(19, 10), color)
-		draw_circle(Vector2(11, -2), 2.2, Color("#102a43"))
-		if sick:
-			draw_circle(Vector2(-2, -4), 3.0, Color("#4a5759"))
-			draw_line(Vector2(3, 5), Vector2(10, 8), Color("#4a5759"), 3.0)
+		frame = 2
+	elif state == GameState.PLAYING and time_left <= 25.0 and not all_oil_clean():
+		frame = 1
+	var facing := -1.0 if faces_right else 1.0
+	var pulse := 1.0 + sin(wave_time * 3.4 + at.y) * 0.035
+	var tilt := sin(wave_time * 2.1 + at.x) * (0.025 if frame == 0 else 0.07)
+	draw_set_transform(at, tilt, Vector2(facing * pulse, pulse))
+	draw_texture_rect_region(FISH_STATE_SHEET, Rect2(-28, -28, 56, 56), Rect2(frame * 64, 0, 64, 64))
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
-
-
-func draw_fish_body(center: Vector2, radius: Vector2, color: Color) -> void:
-	var points := PackedVector2Array()
-	for index in range(24):
-		var angle := TAU * float(index) / 24.0
-		points.append(center + Vector2(cos(angle) * radius.x, sin(angle) * radius.y))
-	draw_colored_polygon(points, color)
 
 
 func draw_rock(at: Vector2) -> void:
