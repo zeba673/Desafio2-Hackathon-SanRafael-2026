@@ -1,108 +1,70 @@
 <div align="center">
 
-# Desafío 2 — Un Mensaje para Jugar
+# Desafío 2 — “Un Mensaje para Jugar”
 
 ### Mini-juego con temática social o ambiental
 
-Una experiencia breve y jugable que transmite un mensaje a través de sus mecánicas.
-
-![Modalidad](https://img.shields.io/badge/modalidad-mini--juego-478CBF?style=flat-square)
-![Temáticas](https://img.shields.io/badge/temáticas-convivencia%20%7C%20medioambiente-2F855A?style=flat-square)
-![Evaluación](https://img.shields.io/badge/evaluación-100%20puntos-6B7280?style=flat-square)
-
 </div>
+
+Cada grupo elige UNA de las dos líneas temáticas propuestas y construye una experiencia breve que transmita ese mensaje.
 
 ---
 
-## Sobre el desafío
+## Línea temática 1 — Convivencia: “Un Lugar Seguro”
 
-Cada grupo debe elegir **una** de las dos líneas temáticas propuestas y construir una experiencia breve que transmita su mensaje:
+**Contexto:** el juego debe representar situaciones cotidianas escolares en las que ocurre exclusión, burla o maltrato entre compañeros, y el jugador debe optar por actitudes de acompañamiento en lugar de indiferencia.
 
-| Línea temática | Propuesta | Propósito |
-|---|---|---|
-| **Convivencia** | **Un Lugar Seguro** | Representar situaciones escolares de exclusión, burla o maltrato y promover actitudes de acompañamiento. |
-| **Medioambiente** | **EcoMisión** | Cumplir una misión ambiental concreta para cuidar o restaurar un espacio con tiempo o acciones limitadas. |
+### Ejemplo de mecánica 1: “Recorrido por escenas”
 
-> [!IMPORTANT]
-> El grupo debe elegir una sola línea temática. La mecánica del juego tiene que comunicar con claridad el mensaje seleccionado.
+El juego se divide en 3 o 4 escenas cortas que representan distintos espacios (el patio en el recreo, el aula durante una clase, un grupo de chat o red social). En cada escena aparecen varios personajes, y uno de ellos está siendo excluido o molestado (por ejemplo, sentado solo aparte del grupo, o recibiendo mensajes negativos en pantalla). El jugador controla a un personaje “testigo” que debe moverse y acercarse específicamente a quien está en esa situación —no a los demás personajes— antes de que se acabe el tiempo de la escena. Si logra acercarse a tiempo, suma puntos de “empatía” y avanza a la escena siguiente; si el tiempo se agota sin que se haya acercado, pierde puntos o debe repetir la escena.
 
-## Línea temática 1 — Convivencia
+### Ejemplo de mecánica 2: “Elección de diálogo”
 
-### Un Lugar Seguro
+En pantalla aparece una situación breve narrada con texto (por ejemplo: “Un compañero se ríe de otro por su ropa frente al curso”), junto con 2 o 3 opciones de respuesta o acción para elegir (por ejemplo: “reírse también”, “no decir nada y seguir de largo”, “acercarse y preguntarle si está bien”). El jugador debe tocar o hacer clic en la opción que representa una actitud de acompañamiento. Elegir correctamente suma puntos y muestra en pantalla una breve consecuencia positiva; elegir una opción de indiferencia o agresión resta puntos y muestra una consecuencia negativa. La secuencia se repite con 4 o 5 situaciones distintas antes de llegar a la pantalla final.
 
-El juego debe representar situaciones cotidianas escolares en las que ocurre exclusión, burla o maltrato entre compañeros. El jugador debe optar por actitudes de acompañamiento en lugar de indiferencia.
+## Línea temática 2 — Medioambiente: “EcoMisión”
 
-#### Ejemplo de mecánica 1 — Recorrido por escenas
+**Contexto:** el jugador debe cumplir una misión ambiental concreta, cuidando o restaurando un espacio (un barrio, un río, una plaza, un bosque) dentro de un tiempo o una cantidad de acciones limitada.
 
-El juego se divide en **3 o 4 escenas cortas** ambientadas en espacios como el patio durante el recreo, el aula en una clase o un grupo de chat o red social.
+### Ejemplo de mecánica 1: “Separación de residuos”
 
-En cada escena, uno de los personajes está siendo excluido o molestado. El jugador controla a un personaje testigo y debe acercarse específicamente a quien atraviesa esa situación antes de que termine el tiempo. Si lo consigue, suma puntos de empatía y avanza; si el tiempo se agota, pierde puntos o repite la escena.
+Distintos tipos de residuos van cayendo o apareciendo en pantalla de forma progresiva (por ejemplo: una botella plástica, un resto de comida, una hoja de papel, una pila). El jugador debe arrastrar o dirigir cada residuo hacia el contenedor correcto (reciclable, orgánico, peligroso) antes de que se acabe el tiempo o de que se acumulen demasiados residuos sin clasificar en pantalla. Clasificar correctamente suma puntos; clasificar en el contenedor equivocado, o dejar que un residuo quede sin clasificar, resta puntos o vidas.
 
-#### Ejemplo de mecánica 2 — Elección de diálogo
+### Ejemplo de mecánica 2: “Limpieza y esquiva”
 
-La pantalla presenta una situación breve junto con **2 o 3 respuestas o acciones posibles**. El jugador debe elegir la opción que representa una actitud de acompañamiento.
+El personaje recorre un escenario contaminado (un río, una plaza, una playa) recolectando elementos de contaminación visibles (bolsas, botellas, manchas de humo) mientras esquiva obstáculos que representan el avance del deterioro ambiental (por ejemplo, manchas de contaminación que se expanden por el escenario con el paso del tiempo). Cada elemento recolectado suma “puntos verdes”; si la contaminación llega a cubrir una porción determinada del escenario antes de que el jugador termine su recorrido, el juego se pierde.
 
-Una elección correcta suma puntos y muestra una consecuencia positiva. Una respuesta indiferente o agresiva resta puntos y muestra una consecuencia negativa. La secuencia se repite con **4 o 5 situaciones** antes de llegar a la pantalla final.
+## Requisitos base (obligatorios, ambas líneas temáticas)
 
-## Línea temática 2 — Medioambiente
-
-### EcoMisión
-
-El jugador debe cumplir una misión ambiental concreta para cuidar o restaurar un barrio, río, plaza o bosque dentro de un tiempo o una cantidad de acciones limitada.
-
-#### Ejemplo de mecánica 1 — Separación de residuos
-
-Distintos residuos aparecen progresivamente en pantalla, como una botella plástica, un resto de comida, una hoja de papel o una pila. El jugador debe arrastrar o dirigir cada elemento hacia el contenedor correcto —reciclable, orgánico o peligroso— antes de que termine el tiempo o se acumulen demasiados residuos.
-
-Clasificar correctamente suma puntos. Usar el contenedor equivocado o dejar un residuo sin clasificar resta puntos o vidas.
-
-#### Ejemplo de mecánica 2 — Limpieza y esquiva
-
-El personaje recorre un escenario contaminado, como un río, una plaza o una playa. Durante el recorrido recolecta bolsas, botellas o manchas de humo mientras esquiva obstáculos que representan el avance del deterioro ambiental.
-
-Cada elemento recolectado suma puntos verdes. Si la contaminación cubre una porción determinada del escenario antes de completar el recorrido, el juego se pierde.
-
-## Requisitos base
-
-Estos requisitos son obligatorios para ambas líneas temáticas:
-
-- El jugador puede controlar un personaje u objeto mediante teclado, mouse o touch.
-- Existe un objetivo claro y jugable: llegar a una meta, alcanzar un puntaje o resolver una serie de situaciones.
-- Existe una condición de victoria y una condición de derrota o cierre; el juego no puede quedar sin final.
-- Hay al menos una mecánica de interacción con feedback inmediato, como una colisión, un clic o un arrastre que sume o reste puntos.
-- Una pantalla o mensaje final cierra la experiencia de manera coherente con el mensaje elegido.
+1. El jugador puede controlar un personaje u objeto (teclado, mouse o touch).
+2. Existe un objetivo claro y jugable (llegar a una meta, alcanzar un puntaje, resolver una serie de situaciones).
+3. Existe una condición de victoria y una de derrota o cierre (no puede quedar “sin final”).
+4. Al menos una mecánica de interacción con feedback inmediato (colisión, clic o arrastre que sume o reste puntos).
+5. Una pantalla o mensaje final que cierre la experiencia de forma coherente con el mensaje elegido.
 
 ## Opcionales
 
-- Más de una escena, nivel o situación dentro del mismo juego.
-- Narrativa con textos o diálogos más elaborados.
+- Más de una escena, nivel o situación distinta dentro del mismo juego.
+- Narrativa con texto o diálogos más elaborados.
 - Música o sonido que refuerce el clima emocional de cada escena.
-- Variación visual entre escenas mediante fondos, personajes o paletas de color distintas.
-- Un párrafo o una pantalla final que explique la intención del grupo más allá del juego.
+- Variación visual entre escenas (fondos, personajes o paletas de color distintas).
+- Un párrafo o pantalla de cierre escrito explicando la intención del grupo, más allá del juego en sí.
 
 ## Entregables
 
-- Proyecto exportado o accesible mediante archivo, carpeta con el código fuente o enlace.
-- Un párrafo breve de **3 a 5 líneas** que explique qué mensaje quisieron transmitir y por qué eligieron esa mecánica.
-- Una captura de pantalla o un video corto de **30 a 60 segundos** que muestre el juego en funcionamiento.
-- Aclaración del lenguaje o la herramienta utilizada para facilitar la evaluación.
+- Proyecto exportado o accesible (archivo, carpeta con el código fuente, o link).
+- Un párrafo breve (3-5 líneas) explicando qué mensaje quisieron transmitir y por qué eligieron esa mecánica.
+- Captura de pantalla o video corto (30-60 seg) mostrando el juego en funcionamiento.
+- Aclaración de qué lenguaje o herramienta utilizaron (para facilitar la evaluación).
 
-## Rúbrica de evaluación
+## Rúbrica de evaluación (100 puntos)
 
 | Criterio | Descripción | Puntos |
 |---|---|---:|
-| **Funcionamiento técnico** | El juego corre sin errores: control, interacción y feedback funcionan. | 20 |
-| **Objetivo y cierre del juego** | Hay una meta clara y una condición de victoria o derrota coherente. | 20 |
-| **Coherencia con el mensaje** | La mecánica representa claramente la temática seleccionada: convivencia o medioambiente. | 25 |
-| **Fundamentación** | El grupo explica con claridad la intención detrás del diseño elegido. | 15 |
-| **Trabajo en equipo y presentación** | La participación del grupo es equilibrada y el resultado se presenta con claridad. | 15 |
-| **Creatividad y estética** | El sonido, el arte o la narrativa refuerzan el mensaje elegido. | 5 |
-| **Total** |  | **100** |
-
----
-
-<div align="center">
-
-**Elegir una temática · Convertir el mensaje en una mecánica · Crear una experiencia con cierre**
-
-</div>
+| Funcionamiento técnico | El juego corre sin errores: control, interacción y feedback funcionan. | 20 |
+| Objetivo y cierre del juego | Hay una meta clara y una condición de victoria/derrota coherente. | 20 |
+| Coherencia con el mensaje | La mecánica elegida representa de forma clara la temática seleccionada (convivencia o medioambiente). | 25 |
+| Fundamentación (texto breve) | El grupo explica con claridad la intención detrás del diseño elegido. | 15 |
+| Trabajo en equipo y presentación | Participación equilibrada del grupo y claridad al presentar el resultado. | 15 |
+| Creatividad / estética | Uso de sonido, arte o narrativa que refuerza el mensaje elegido. | 5 |
+| TOTAL |  | 100 |
