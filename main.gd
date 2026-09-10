@@ -5,6 +5,11 @@ enum NetState { IDLE, CAST, CATCH, MISS }
 
 const KAYAK_SHEET = preload("res://assets/kayak-net-sprites-transparent.png")
 const OBJECT_SHEET = preload("res://assets/river-object-sprites.png")
+const RIVER_AMBIENCE = preload("res://assets/audio/river_ambience.wav")
+const WATER_IMPACT = preload("res://assets/audio/water_impact.wav")
+const COLLECT_SOUND = preload("res://assets/audio/collect.wav")
+const VICTORY_SOUND = preload("res://assets/audio/victory.wav")
+const FAILURE_SOUND = preload("res://assets/audio/failure.wav")
 
 const SCREEN := Vector2(1152, 648)
 const GAME_TIME := 150.0
@@ -51,9 +56,30 @@ func _ready() -> void:
 	get_window().title = "EcoMisión: Rescate en Kayak"
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	bottles.assign(bottle_spawns)
+	start_ambience()
 	if "--self-test" in OS.get_cmdline_user_args():
 		run_self_test()
 	queue_redraw()
+
+
+func start_ambience() -> void:
+	var loop_stream := RIVER_AMBIENCE.duplicate() as AudioStreamWAV
+	loop_stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	var audio_player := AudioStreamPlayer.new()
+	audio_player.stream = loop_stream
+	audio_player.volume_db = -18.0
+	add_child(audio_player)
+	audio_player.play()
+
+
+func play_sound(stream: AudioStream, volume_db := 0.0, pitch_scale := 1.0) -> void:
+	var audio_player := AudioStreamPlayer.new()
+	audio_player.stream = stream
+	audio_player.volume_db = volume_db
+	audio_player.pitch_scale = pitch_scale
+	audio_player.finished.connect(audio_player.queue_free)
+	add_child(audio_player)
+	audio_player.play()
 
 
 func run_self_test() -> void:
@@ -131,6 +157,7 @@ func hit_rock() -> void:
 	flash = 0.35
 	notice = "¡Cuidado! La roca costó 3 segundos"
 	notice_time = 1.5
+	play_sound(WATER_IMPACT, -5.0, 0.72)
 
 
 func cast_net() -> void:
@@ -138,6 +165,7 @@ func cast_net() -> void:
 		return
 	net_state = NetState.CAST
 	net_timer = 0.18
+	play_sound(WATER_IMPACT, -11.0, 1.32)
 	pending_bottle = -1
 	var target := player + direction * 92.0
 	var best_distance := 66.0
@@ -152,11 +180,13 @@ func resolve_net() -> void:
 	if pending_bottle >= 0 and pending_bottle < bottles.size():
 		bottles.remove_at(pending_bottle)
 		net_state = NetState.CATCH
+		play_sound(COLLECT_SOUND, -2.0, 1.08)
 		flash = 0.16
 		notice = "+1 botella recuperada"
 	else:
 		net_state = NetState.MISS
 		notice = "La red no atrapó nada"
+		play_sound(FAILURE_SOUND, -9.0, 1.25)
 	net_timer = 0.42
 	notice_time = 1.1
 	pending_bottle = -1
@@ -177,11 +207,13 @@ func start_game() -> void:
 	net_state = NetState.IDLE
 	net_timer = 0.0
 	pending_bottle = -1
+	play_sound(COLLECT_SOUND, -8.0, 0.9)
 
 
 func finish_game(won: bool, reason: String) -> void:
 	state = GameState.WON if won else GameState.LOST
 	end_reason = reason
+	play_sound(VICTORY_SOUND if won else FAILURE_SOUND, -1.5)
 
 
 func _unhandled_input(event: InputEvent) -> void:
